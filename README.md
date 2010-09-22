@@ -1,5 +1,3 @@
-<!-- $Id: README.txt,v 1.4 2010/06/07 21:01:29 jmiccolis Exp $ -->
-
 # KIT
 
 [Kit](http://drupal.org/project/kit) is a compilation of tools and

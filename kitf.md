@@ -1,5 +1,3 @@
-<!-- $Id: kitt.txt,v 1.1 2010/03/19 17:43:51 yhahn Exp $ -->
-
 KIT Theme Specification (kitt 1.0-draft)
 ------------------------------------------
 This document provides recommendations and requirements for Drupal themes to
