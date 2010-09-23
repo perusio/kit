@@ -1,7 +1,9 @@
-KIT Theme Specification (kitt 1.0-draft)
+KIT Feature Specification (kitf 1.0-draft)
 ------------------------------------------
-This document provides recommendations and requirements for Drupal themes to
-ensure the compatibility of themes with kitf-compliant features.
+This document provides recommendations and requirements for Drupal features to
+ensure the interoperability of features between different distributions and
+prevent conflicts between features themselves and between a compliant feature
+and a distribution.
 
 This document is based on the Drupal 6.x versions of Drupal core, contributed
 modules and themes.
@@ -9,108 +11,418 @@ modules and themes.
 
 1. Introduction
 ---------------
-Drupal theme developers have traditionally looked to Garland, other core themes
-and quality contributed themes to determine what elements they may or may not
-provide, what the boundaries of their customization might be, and how to best
-ensure compatibility with module-level functionality.
+A feature is a Drupal module that provides a collection of Drupal entities which
+taken together satisfy a certain use case. A feature module differs from a
+standard Drupal module in several ways:
 
-This document aims to state explicitly what some of the requirements and
-recommendations are for Drupal themes with an eye toward compatibility with
-kitf-compliant features.
+- A feature is built to target one or more use cases - concrete, task-specific
+functionality - not address a general problem space.
+- The bulk of a feature's work is to provide exported configuration, either in
+the form of exportables or scripted configuration of components.
+- A feature provides no API of its own. Any custom code and hooks it may
+implement are targeted at addressing user stories.
+
+
+### Terminology
+
+- A **feature** is a Drupal module that provides a collection of Drupal entities
+which taken together satisfy a certain use case. Example:a gallery feature
+provides a gallery view, a photo content type, and several blocks allowing a
+user to add new photos and browse those submitted by others.
+- A **component** is an individual object or configured setting provided by a
+feature. Example: a `gallery` view, the `comment_gallery` variable.
+- A **distribution** or **distro** is a a fully configured and usable Drupal
+instance. It can refer to a specific install profile or a single, custom Drupal
+site that has been setup and configured manually. Example: Open Atrium, a
+personal blog at http://example.com/myblog
+
+
+### Feature creation
+
+The specific methods used to create and implement a feature are not prescribed
+by this document. For our purposes, any of the following are acceptable methods
+of implementing a feature:
+
+- Exporting components and writing their default hooks by hand to a custom
+module.
+- Scripting the creation of components and/or enforcing settings at install
+time.
+- Using the [Features module](http://drupal.org/project/features) to generate a
+feature from exportable components.
 
 
 ### Declaring compliance
 
-Themes compliant with this specification may declare themselves as such in
-their theme `.info` file using the `kitt` key and the version of this document
+Features compliant with this specification may declare themselves as such in
+their module `.info` file using the `kitf` key and the version of this document
 to which they comply. Example:
 
-    kitt = "1.0-draft"
+    kitf = "1.0-draft"
 
 
-2. Regions
-----------
-In order to ensure interoperability with kitf-compliant features, a theme should
-implement the following regions:
+### Distro features
+
+Some features cannot comply with this specification and should not aim to.
+Features that package configuration above and beyond any specific user stories
+or play a setup and site configuration role similar to install profiles are
+called distro features. Kit compliant features can expect distro features to
+claim variables like `site_frontpage` and permissions like `access content`.
+
+
+2. Namespaces
+-------------
+The naming of a feature and its components are critical to its viability as a
+portable, interoperable module. Namespace conflicts can prevent code from
+execution and poor naming conventions can confuse users and other developers.
+
+
+### 2.1 Code namespace
+
+The code namespace includes a prefix to all PHP functions, the directory name of
+the feature module, and the names of files used by that feature module.
+
+- A feature must, to the best of the creator's knowledge, use a unique code
+namespace.
+- Example: `dazzle_blog`, not `blog`
+
+
+### 2.2 Project namespace
+
+The project namespace is the key used for retrieving a project's update XML
+feed.
+
+- Where possible, a feature's project namespace should match its code namespace.
+A feature's project namespace may be different from its code namespace if it is
+to be bundled with others and share an update XML feed.
+- Example: `dazzle_blog`, `dazzle_features`, `dazzle`
+
+
+### 2.3 Machine name
+
+The machine name is the machine-readable name that best describes the use case
+captured by a feature.
+
+- A feature's machine name need not be unique.
+- Example: `blog`, `gallery`, `timetracker`
+
+
+### 2.4 Human readable name
+
+The human readable name of a feature is the name displayed in the Drupal admin
+UI for the feature as well as the name used for a feature in documentation and
+conversation.
+
+- A feature's human readable name need not be unique.
+- Example: Blog, Gallery, Time Tracker
+
+
+### 2.5 Component namespace
+
+The component namespace is the naming convention used for any components (views,
+content types, etc.) included in a feature.
+
+- A feature's component namespace need not be unique. Each component name should
+be prepended by the feature machine name whenever possible.
+- Example: `blog_listing`, not `recent_blog_posts`
+
+
+3. User roles and permissions
+-----------------------------
+A feature should provide default role and permission settings for permissions
+that are tightly related to its functionality. Properly implemented, a feature
+should be usable immediately after being enabled with proper permissions for
+most scenarios.
+
+
+### 3.1 Required user roles
+
+The following use roles must be accounted for in any permissions that are
+exported or configured by a feature:
+
+- `anonymous user` is a Drupal user who has not been authenticated on the site.
+- `authenticated user` is a Drupal user who has been authenticated and is
+currently logged in on the site.
+- `administrator` is a Drupal user with administrative duties and is expected
+to perform site building and configuration tasks.
+
+Additional roles may be provided by a feature if appropriate for its use case.
+
+
+### 3.2 Permissions
+
+Permissions exported or configured by a feature must be **directly** related to
+a feature's use case and functionality. Permissions that are unrelated or apply
+to a variety of other possible functionalities must not be included with a
+feature. A general rule of thumb is to ask whether the feature can function
+sufficiently without the permission in question configured. If possible, the
+permission should be left to the distro to configure instead.
+
+- Example: A blog feature may include `create blog content`, `delete own blog
+content`, `edit own blog content` permissions. It may not include `administer
+nodes`, `access all views`, `access administration pages`.
+
+
+### 3.3 Restricted permissions
+
+The following list of permissions are examples of permissions that are
+considered restricted from use by a feature. It is by no means an exhaustive
+list nor a strict one. Some features may have a strong reason to include one or
+more of these permissions in order to implement its use case. For example, a
+feature that directly affects the authentication process of Drupal may have good
+claim to the permission `change own username`. In all other cases, configuration
+of these permissions should be left to the distro.
+
+    block
+      administer blocks
+      use PHP for block visibility
+    comments
+      access comments
+      administer comments
+      post comments
+      post comments without approval
+    filter
+      administer filters
+    menu
+      administer menu
+    node
+      access content
+      administer content types
+      administer nodes
+      delete revisions
+      revert revisions
+      view revisions
+    search
+      administer search
+      search content
+      use advanced search
+    system
+      access administration pages
+      access site reports
+      administer actions
+      administer files
+      administer site configuration
+      select different theme
+    taxonomy
+      administer taxonomy
+    upload module
+      upload files
+      view uploaded files
+    user module
+      access user profiles
+      administer permissions
+      administer users
+      change own username
+
+
+4. Variables
+------------
+Like permissions, a feature may configure default values for variables where
+they **directly** relate to a feature's use case. Variables that are unrelated
+to a feature's use case or apply to a more general range of use cases must not
+be included.
+
+- Example: A blog feature may include `comment_blog`, `node_options_blog`,
+variables. It may not include `site_frontpage`, `teaser_length`,
+`user_register`.
+
+
+### 4.1 Restricted variables
+
+The following list of variables are examples of variables that are considered
+restricted from use by a feature. Like the permission list in 3.3, it is meant
+to illustrate variables that are often more general than the use cases commonly
+targeted by individual features. Like permissions, exceptions exist where it
+makes sense for a feature to make claim to one of the listed variables.
+
+    dblog
+      dblog_row_limit
+    filter
+      filter_default_format
+    menu
+      menu_default_node_menu
+      menu_primary_links_source
+      menu_secondary_links_source
+    node
+      default_nodes_main
+      node_preview
+      teaser_length
+    path
+      clean_url
+    search
+      minimum_word_size
+      overlap_cjk
+      search_cron_limit
+    statistics
+      statistics_count_content_views
+      statistics_enable_access_log
+      statistics_flush_accesslog_timer
+    system
+      admin_theme
+      anonymous
+      block_cache
+      cache
+      cache_lifetime
+      clean_url
+      configurable_timezones
+      date_default_timezone
+      date_first_day
+      date_format_long
+      date_format_long_custom
+      date_format_medium
+      date_format_medium_custom
+      date_format_short
+      date_format_short_custom
+      error_level
+      feed_default_items
+      feed_item_length
+      file_downloads
+      image_toolkit
+      node_admin_theme
+      page_compression
+      preprocess_css
+      preprocess_js
+      site_403
+      site_404
+      site_footer
+      site_frontpage
+      site_mail
+      site_mission
+      site_name
+      site_offline
+      site_offline_message
+      site_slogan
+      theme_default
+      user_pictures
+    taxonomy
+      taxonomy_override_selector
+      taxonomy_terms_per_page_admin
+    throttle
+      throttle_anonymous
+      throttle_probability_limiter
+      throttle_user
+    update
+      update_check_frequency
+      update_fetch_url
+      update_last_check
+      update_max_fetch_attempts
+      update_notification_threshold
+      update_notify_emails
+    upload
+      upload_extensions_default
+      upload_list_default
+      upload_max_resolution
+      upload_uploadsize_default
+      upload_usersize_default
+    user
+      user_email_verification
+      user_mail_status_activated_notify
+      user_mail_status_blocked_notify
+      user_mail_status_deleted_notify
+      user_picture_default
+      user_picture_dimensions
+      user_picture_file_size
+      user_picture_guidelines
+      user_picture_path
+      user_pictures
+      user_register
+      user_registration_help
+      user_signatures
+
+
+5. Paths and menu items
+-----------------------
+A feature may implement new Drupal pages and menu items by registering paths
+through `hook_menu()` or through another providing module. A feature may also
+override existing paths directly related to its use case using
+`hook_menu_alter()`.
+
+
+### 5.1 Primary path
+
+The primary path of a feature is the most prominent page path which provides the
+starting or entry point to a feature's provided functionality. Some features may
+not have a primary path.
+
+- A feature's primary path should match its machine name where possible.
+- Example: A blog feature should have a primary path of `blog`, not `news` or
+`latest-blog-posts`.
+
+
+### 5.2 Primary menu item
+
+The primary menu item of a feature is a menu item corresponding to the primary
+path of a feature. Some features (including those with a primary path) may not
+have a primary menu item.
+
+- A feature's primary menu item may be placed in any Drupal menu.
+- A feature's primary menu item should be titled using the feature's human
+readable name where possible.
+- Example: A blog feature should provide a primary menu item with the title
+"Blog".
+
+
+### 5.3 Additional paths and menu items
+
+Additional paths and menu items may be titled as seen fit by the feature
+creator.
+
+
+### 5.4 Reserved paths
+
+The following list of paths are examples of paths that are considered restricted
+from use by a feature. Like the permission list in 3.3, it is meant to
+illustrate paths that are often more general than the use cases commonly
+targeted by individual features. Like permissions, exceptions exist where it
+makes sense for a feature to make claim to one of the listed paths.
+
+    node
+      node/%node
+      node/add
+      rss.xml
+    search
+      search
+    taxonomy
+      taxonomy/term/%
+
+
+6. Block visibility and theme regions
+-------------------------------------
+A feature may configure block visibility settings for blocks that **directly**
+provide functionality related to its use case. It may not configure or alter the
+block visibility settings of other blocks.
+
+- Example: A blog feature may set visibility settings for a "Recent comments"
+block. It may not adjust visibility settings for the "User login" block.
+
+
+### 6.1 Theme regions
+
+Drupal's theme layer allows themes to implement any number of custom regions and
+omit ones referenced by the default core theme Garland. A feature should one of
+the following regions for blocks critical to its functionality and can expect a
+compliant theme to support them.
 
 - `content`: The main page content region.
 - `left`: The lefthand sidebar.
 - `right`: The righthand sidebar.
 
-Any number of additional regions may be implemented by a theme.
+Other regions may be used for non-critical blocks.
 
 
-3. Page template variables
---------------------------
-The page template may copy or manipulate their values as needed - the main
-requirement is that the value and purpose served by each variable make it
-through to the page in some reasonable fashion.
+7. Dependencies
+---------------
+A feature may not depend on a module or feature that is not in compliance with
+any of the requirements in this spec.
 
 
-### 3.1 Required variables
+8. Problematic components
+-------------------------
+Components that fail to provide proper exportables, especially those using
+serial IDs as the primary method of manipulating and referencing their
+configuration objects, can be critical blockers to a feature's interoperability.
+The following is a list of modules with known interoperability issues:
 
-The following variables must be output by `page.tpl.php` when they are not empty
-on a given page.
-
-    body_classes
-    closure
-    head
-    head_title
-    language
-    messages
-    primary_links
-    scripts
-    site_name
-    styles
-    tabs
-    title
-
-    content
-    left
-    right
-    [other regions]
-
-
-### 3.2 Recommended variables
-
-The folowing variables are commonly used by site builders but may not make sense
-to include in all themes.
-
-    breadcrumb
-    feed_icons
-    footer_message
-    help
-    logo
-    mission
-    search_box
-    secondary_links
-    site_slogan
-
-
-4. Element attributes
----------------------
-A theme may alter markup of various Drupal elements as they see fit. Certain
-attributes and aspects of markup generated by key theme functions are referenced
-by javascript or CSS in Drupal modules and should not be altered unless the
-theme in question will provide a full replacement for the module-level
-functionality.
-
-
-### 4.1 theme('node')
-
-- Must include a single root level `<div>` element.
-- Must include the class `node`.
-- Must include the id `node-$nid`.
-
-
-### 4.2 theme('block')
-
-- Must include a single root level `<div>` element.
-- Must include the class `block` and `block-$module`.
-- Must include the id `block-$module-$delta`.
-
-
-### 4.3 theme('comment')
-
-- Must include a single root level `<div>` element.
-- Must include the class `comment`.
+- `filter`: serial `fid` for input formats
+- `nodequeue`: serial `qid` for nodequeues
+- `taxonomy`: serial `vid` for vocabularies
+- `wysiwyg`: see filter
